@@ -28,15 +28,15 @@
 .terminal-wrapper {
   flex: 1;
   overflow: hidden;
-  padding: 4px;
+  padding: 0;
   position: relative;
   min-height: 0;
 }
 
-/* Ensure xterm fills the wrapper completely */
 .terminal-wrapper .xterm {
   height: 100% !important;
   width: 100%;
+  padding: 2px 4px;
 }
 
 /* Empty state */

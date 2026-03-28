@@ -181,6 +181,11 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPa
         const rect = termRef.current?.getBoundingClientRect();
         if (rect && rect.width > 10 && rect.height > 10) {
           fitAddon.fit();
+          // Subtract 1 row to prevent last line from being clipped
+          const dims = fitAddon.proposeDimensions();
+          if (dims && dims.rows > 2) {
+            terminal.resize(dims.cols, dims.rows - 1);
+          }
           terminal.scrollToBottom();
         }
       } catch (err) {
