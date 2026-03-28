@@ -15,10 +15,9 @@
     "dev:main": "tsc -p tsconfig.main.json --watch",
     "build": "tsc -p tsconfig.main.json && vite build",
     "start": "electron dist/main/main.js",
-    "pack:mac": "npm run build && electron-builder --mac --x64 --arm64",
+    "pack:mac": "npm run build && electron-builder --mac",
     "pack:win": "npm run build && electron-builder --win --x64",
-    "pack:all": "npm run build && electron-builder --mac --x64 --arm64 --win --x64",
-    "release": "npm run build && electron-builder --mac --x64 --arm64 --win --x64 --publish always"
+    "pack:all": "npm run build && electron-builder --mac --win --x64"
   },
   "dependencies": {
     "@xterm/xterm": "^5.5.0",
