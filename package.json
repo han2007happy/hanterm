@@ -3,13 +3,22 @@
   "version": "0.1.0",
   "description": "Multi-agent terminal with split pane support",
   "main": "dist/main/main.js",
+  "author": "han2007happy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/han2007happy/hanterm.git"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
     "dev:renderer": "vite",
     "dev:main": "tsc -p tsconfig.main.json --watch",
     "build": "tsc -p tsconfig.main.json && vite build",
     "start": "electron dist/main/main.js",
-    "pack": "npm run build && electron-builder"
+    "pack:mac": "npm run build && electron-builder --mac --x64 --arm64",
+    "pack:win": "npm run build && electron-builder --win --x64",
+    "pack:all": "npm run build && electron-builder --mac --x64 --arm64 --win --x64",
+    "release": "npm run build && electron-builder --mac --x64 --arm64 --win --x64 --publish always"
   },
   "dependencies": {
     "@xterm/xterm": "^5.5.0",
@@ -29,5 +38,52 @@
     "typescript": "^5.4.0",
     "vite": "^5.4.0",
     "vite-plugin-electron": "^0.28.0"
+  },
+  "build": {
+    "appId": "com.hanterm.app",
+    "productName": "HanTerm",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "!node_modules/**/build/Release/.deps",
+      "!node_modules/**/build/Release/obj.target"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "directories": {
+      "output": "release"
+    }
   }
 }
