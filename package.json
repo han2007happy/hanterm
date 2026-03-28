@@ -42,6 +42,8 @@
   "build": {
     "appId": "com.hanterm.app",
     "productName": "HanTerm",
+    "npmRebuild": true,
+    "buildDependenciesFromSource": true,
     "files": [
       "dist/**/*",
       "node_modules/**/*",
