@@ -27,4 +27,13 @@ contextBridge.exposeInMainWorld('hanterm', {
   // Clipboard
   checkClipboardImage: () => ipcRenderer.invoke('clipboard-check-image'),
   saveClipboardImage: () => ipcRenderer.invoke('clipboard-save-image'),
+
+  // PTY info
+  getPtyCwd: (panelId: string) => ipcRenderer.invoke('pty-get-cwd', panelId),
+
+  // Bookmarks
+  saveBookmark: (bookmark: { id: string; name: string; cwd: string; content: string; createdAt: string }) =>
+    ipcRenderer.invoke('bookmark-save', bookmark),
+  listBookmarks: () => ipcRenderer.invoke('bookmark-list'),
+  deleteBookmark: (id: string) => ipcRenderer.invoke('bookmark-delete', id),
 });

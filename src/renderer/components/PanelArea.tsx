@@ -1,6 +1,10 @@
-import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import TerminalPanel, { TerminalPanelHandle } from './TerminalPanel';
 import { Tab, LayoutMode, ThemeMode } from '../types';
+
+export interface PanelAreaHandle {
+  getTerminalContent: (panelId: string) => string;
+}
 
 interface Props {
   tabs: Tab[];
@@ -31,10 +35,17 @@ function computeGrid(count: number) {
   return { cols, rows };
 }
 
-export default function PanelArea({ tabs, activeTabId, layout, theme, onSelectTab, onReorderTabs }: Props) {
+const PanelArea = forwardRef<PanelAreaHandle, Props>(function PanelArea({ tabs, activeTabId, layout, theme, onSelectTab, onReorderTabs }, ref) {
   const allPanels = useMemo(() => getAllPanels(tabs), [tabs]);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRefs = useRef<Map<string, TerminalPanelHandle>>(new Map());
+
+  useImperativeHandle(ref, () => ({
+    getTerminalContent: (panelId: string) => {
+      const handle = panelRefs.current.get(panelId);
+      return handle?.getContent() || '';
+    },
+  }));
 
   // Drag state
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
@@ -248,6 +259,8 @@ export default function PanelArea({ tabs, activeTabId, layout, theme, onSelectTa
               showHeader={showHeader}
               isVisible={isVisible}
               theme={theme}
+              restoredContent={tab.restoredContent}
+              restoredCwd={tab.restoredCwd}
               draggable={isVisible && layout === 'split'}
               onFocus={() => onSelectTab(tab.id)}
               onDragStart={(e) => handlePanelDragStart(tab.id, e)}
@@ -260,4 +273,6 @@ export default function PanelArea({ tabs, activeTabId, layout, theme, onSelectTa
       })}
     </div>
   );
-}
+});
+
+export default PanelArea;

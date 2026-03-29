@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 
 export interface TerminalPanelHandle {
   focus: () => void;
+  getContent: () => string;
 }
 
 interface Props {
@@ -14,6 +15,8 @@ interface Props {
   showHeader: boolean;
   isVisible: boolean;
   theme?: 'dark' | 'light';
+  restoredContent?: string;
+  restoredCwd?: string;
   draggable?: boolean;
   onFocus?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
@@ -71,7 +74,7 @@ const lightTheme = {
 };
 
 const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPanel(
-  { panelId, tabName, showHeader, isVisible, theme: themeProp, draggable, onFocus, onDragStart, onDragOver, onDrop, onDragEnd },
+  { panelId, tabName, showHeader, isVisible, theme: themeProp, restoredContent, restoredCwd, draggable, onFocus, onDragStart, onDragOver, onDrop, onDragEnd },
   ref
 ) {
   const termRef = useRef<HTMLDivElement>(null);
@@ -92,8 +95,18 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPa
         term.scrollToBottom();
         term.focus();
       }
-      // Re-fit after becoming visible
       try { fitAddonRef.current?.fit(); } catch (_) {}
+    },
+    getContent: () => {
+      const term = xtermRef.current;
+      if (!term) return '';
+      const buf = term.buffer.active;
+      const lines: string[] = [];
+      for (let i = 0; i <= buf.cursorY + buf.baseY; i++) {
+        const line = buf.getLine(i);
+        if (line) lines.push(line.translateToString(true));
+      }
+      return lines.join('\n');
     },
   }));
 
@@ -199,7 +212,16 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPa
       setTimeout(() => {
         safeFit();
 
-        window.hanterm.createPty(panelId).then((result: { panelId?: string; error?: string }) => {
+        // Write restored content before PTY connects (so it appears as history)
+        if (restoredContent) {
+          const lines = restoredContent.split('\n');
+          lines.forEach(line => {
+            terminal.write(line + '\r\n');
+          });
+          terminal.write('\x1b[90m--- restored session ---\x1b[0m\r\n');
+        }
+
+        window.hanterm.createPty(panelId, restoredCwd || undefined).then((result: { panelId?: string; error?: string }) => {
           if (result?.error) {
             terminal.write(`\r\n\x1b[31m[Error] Failed to create shell: ${result.error}\x1b[0m\r\n`);
             return;

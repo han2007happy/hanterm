@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './Sidebar';
-import PanelArea from './PanelArea';
-import { Tab, LayoutMode, ThemeMode } from '../types';
+import PanelArea, { PanelAreaHandle } from './PanelArea';
+import { Tab, LayoutMode, ThemeMode, Bookmark } from '../types';
 import '../styles/sidebar.css';
 import '../styles/panels.css';
 
 let tabIdSeq = 0;
 
-function createTab(name?: string): Tab {
+function createTab(name?: string, restoredContent?: string, restoredCwd?: string): Tab {
   tabIdSeq++;
   const id = `tab-${Date.now()}-${tabIdSeq}`;
   return {
     id,
     name: name || `Tab ${tabIdSeq}`,
     panels: [{ id: `panel-${id}`, tabId: id }],
+    restoredContent,
+    restoredCwd,
   };
 }
 
@@ -23,8 +25,15 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState<string>(() => initialTab.current.id);
   const [layout, setLayout] = useState<LayoutMode>('stack');
   const [theme, setTheme] = useState<ThemeMode>('dark');
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const activeTabRef = useRef(activeTabId);
   activeTabRef.current = activeTabId;
+  const panelAreaRef = useRef<PanelAreaHandle>(null);
+
+  // Load bookmarks on mount
+  useEffect(() => {
+    window.hanterm?.listBookmarks().then(setBookmarks);
+  }, []);
 
   // Receive config from main process
   useEffect(() => {
@@ -64,7 +73,6 @@ export default function App() {
         setActiveTabId(tab.id);
         return [tab];
       }
-      // Fix active tab selection using current prev state (not stale closure)
       setActiveTabId((current) => {
         if (current === tabId) {
           const idx = prev.findIndex((t) => t.id === tabId);
@@ -93,6 +101,50 @@ export default function App() {
     });
   }, []);
 
+  // Bookmark a tab
+  const bookmarkTab = useCallback(async (tabId: string) => {
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab || !window.hanterm) return;
+
+    const panelId = tab.panels[0]?.id;
+    if (!panelId) return;
+
+    // Get current working directory
+    const cwd = await window.hanterm.getPtyCwd(panelId) || '~';
+
+    // Get terminal content
+    const content = panelAreaRef.current?.getTerminalContent(panelId) || '';
+
+    const bookmark: Bookmark = {
+      id: `bm-${Date.now()}`,
+      name: tab.name,
+      cwd,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    const result = await window.hanterm.saveBookmark(bookmark);
+    if (result.success) {
+      const updated = await window.hanterm.listBookmarks();
+      setBookmarks(updated);
+    }
+  }, [tabs]);
+
+  // Open a bookmark as a new tab
+  const openBookmark = useCallback((bookmark: Bookmark) => {
+    const tab = createTab(bookmark.name, bookmark.content, bookmark.cwd);
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  // Delete a bookmark
+  const deleteBookmark = useCallback(async (id: string) => {
+    if (!window.hanterm) return;
+    await window.hanterm.deleteBookmark(id);
+    const updated = await window.hanterm.listBookmarks();
+    setBookmarks(updated);
+  }, []);
+
   const toggleLayout = useCallback(() => {
     setLayout((prev) => (prev === 'split' ? 'stack' : 'split'));
   }, []);
@@ -101,7 +153,7 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
-  // Keyboard shortcuts — use refs to avoid stale closures
+  // Keyboard shortcuts
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
@@ -146,16 +198,21 @@ export default function App() {
           tabs={tabs}
           activeTabId={activeTabId}
           layout={layout}
+          theme={theme}
+          bookmarks={bookmarks}
           onSelectTab={setActiveTabId}
           onAddTab={addTab}
           onCloseTab={closeTab}
           onRenameTab={renameTab}
           onReorderTabs={reorderTabs}
+          onBookmarkTab={bookmarkTab}
+          onOpenBookmark={openBookmark}
+          onDeleteBookmark={deleteBookmark}
           onToggleLayout={toggleLayout}
           onToggleTheme={toggleTheme}
-          theme={theme}
         />
         <PanelArea
+          ref={panelAreaRef}
           tabs={tabs}
           activeTabId={activeTabId}
           layout={layout}

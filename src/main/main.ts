@@ -139,6 +139,69 @@ ipcMain.handle('pty-kill', (_event, panelId: string) => {
   return true;
 });
 
+// Get working directory of a PTY process
+ipcMain.handle('pty-get-cwd', (_event, panelId: string) => {
+  const entry = ptys.get(panelId);
+  if (!entry) return null;
+  try {
+    const pid = entry.process.pid;
+    const result = require('child_process').execSync(
+      `lsof -a -d cwd -p ${pid} -Fn 2>/dev/null | grep ^n | cut -c2-`,
+      { encoding: 'utf8', timeout: 3000 }
+    ).trim();
+    return result || os.homedir();
+  } catch {
+    return os.homedir();
+  }
+});
+
+// Bookmark management
+const bookmarkDir = path.join(os.homedir(), '.hanterm', 'bookmarks');
+
+ipcMain.handle('bookmark-save', (_event, bookmark: {
+  id: string;
+  name: string;
+  cwd: string;
+  content: string;
+  createdAt: string;
+}) => {
+  try {
+    if (!fs.existsSync(bookmarkDir)) {
+      fs.mkdirSync(bookmarkDir, { recursive: true });
+    }
+    const filePath = path.join(bookmarkDir, `${bookmark.id}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(bookmark, null, 2));
+    return { success: true };
+  } catch (err) {
+    return { error: String(err) };
+  }
+});
+
+ipcMain.handle('bookmark-list', () => {
+  try {
+    if (!fs.existsSync(bookmarkDir)) return [];
+    const files = fs.readdirSync(bookmarkDir).filter(f => f.endsWith('.json'));
+    return files.map(f => {
+      const data = JSON.parse(fs.readFileSync(path.join(bookmarkDir, f), 'utf8'));
+      return data;
+    }).sort((a: { createdAt: string }, b: { createdAt: string }) =>
+      b.createdAt.localeCompare(a.createdAt)
+    );
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('bookmark-delete', (_event, id: string) => {
+  try {
+    const filePath = path.join(bookmarkDir, `${id}.json`);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    return { success: true };
+  } catch (err) {
+    return { error: String(err) };
+  }
+});
+
 // Clipboard image paste handling
 const imageDir = path.join(os.homedir(), '.hanterm', 'images');
 

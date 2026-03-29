@@ -1,16 +1,20 @@
 import React, { useState, useRef } from 'react';
-import { Tab, LayoutMode, ThemeMode } from '../types';
+import { Tab, LayoutMode, ThemeMode, Bookmark } from '../types';
 
 interface Props {
   tabs: Tab[];
   activeTabId: string;
   layout: LayoutMode;
   theme: ThemeMode;
+  bookmarks: Bookmark[];
   onSelectTab: (id: string) => void;
   onAddTab: () => void;
   onCloseTab: (id: string) => void;
   onRenameTab: (id: string, name: string) => void;
   onReorderTabs: (fromTabId: string, toTabId: string) => void;
+  onBookmarkTab: (tabId: string) => void;
+  onOpenBookmark: (bookmark: Bookmark) => void;
+  onDeleteBookmark: (id: string) => void;
   onToggleLayout: () => void;
   onToggleTheme: () => void;
 }
@@ -20,17 +24,22 @@ export default function Sidebar({
   activeTabId,
   layout,
   theme,
+  bookmarks,
   onSelectTab,
   onAddTab,
   onCloseTab,
   onRenameTab,
   onReorderTabs,
+  onBookmarkTab,
+  onOpenBookmark,
+  onDeleteBookmark,
   onToggleLayout,
   onToggleTheme,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [showBookmarks, setShowBookmarks] = useState(false);
   const dragSourceId = useRef<string | null>(null);
 
   const startRename = (tab: Tab) => {
@@ -48,7 +57,7 @@ export default function Sidebar({
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <span>HanTerm</span>
+        <span>HANTERM</span>
         <button onClick={onAddTab} title="New Tab (Cmd+T)">+</button>
       </div>
 
@@ -112,18 +121,64 @@ export default function Sidebar({
             ) : (
               <span className="tab-name">{tab.name}</span>
             )}
-            <button
-              className="tab-close"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCloseTab(tab.id);
-              }}
-              title="Close Tab"
-            >
-              x
-            </button>
+            <div style={{ display: 'flex', gap: 2 }}>
+              <button
+                className="tab-action"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBookmarkTab(tab.id);
+                }}
+                title="Bookmark this tab"
+              >
+                *
+              </button>
+              <button
+                className="tab-close"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloseTab(tab.id);
+                }}
+                title="Close Tab"
+              >
+                x
+              </button>
+            </div>
           </div>
         ))}
+      </div>
+
+      {/* Bookmarks section */}
+      <div className="bookmark-section">
+        <div
+          className="bookmark-header"
+          onClick={() => setShowBookmarks(!showBookmarks)}
+        >
+          <span>{showBookmarks ? '▾' : '▸'} Bookmarks ({bookmarks.length})</span>
+        </div>
+        {showBookmarks && (
+          <div className="bookmark-list">
+            {bookmarks.length === 0 ? (
+              <div className="bookmark-empty">No bookmarks yet</div>
+            ) : (
+              bookmarks.map((bm) => (
+                <div key={bm.id} className="bookmark-item" onClick={() => onOpenBookmark(bm)}>
+                  <div className="bookmark-name">{bm.name}</div>
+                  <div className="bookmark-cwd">{bm.cwd.replace(/^\/Users\/[^/]+/, '~')}</div>
+                  <button
+                    className="bookmark-delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteBookmark(bm.id);
+                    }}
+                    title="Delete bookmark"
+                  >
+                    x
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="sidebar-footer">
