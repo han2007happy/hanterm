@@ -88,14 +88,27 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPa
     height: number;
   } | null>(null);
 
+  // Centralized fit + scroll helper
+  const fitAndScroll = useCallback(() => {
+    try {
+      const rect = termRef.current?.getBoundingClientRect();
+      if (!rect || rect.width < 10 || rect.height < 10) return;
+      const fitAddon = fitAddonRef.current;
+      const term = xtermRef.current;
+      if (!fitAddon || !term) return;
+      fitAddon.fit();
+      const dims = fitAddon.proposeDimensions();
+      if (dims && dims.rows > 2) {
+        term.resize(dims.cols, dims.rows - 1);
+      }
+      term.scrollToBottom();
+    } catch (_) {}
+  }, []);
+
   useImperativeHandle(ref, () => ({
     focus: () => {
-      const term = xtermRef.current;
-      if (term) {
-        term.scrollToBottom();
-        term.focus();
-      }
-      try { fitAddonRef.current?.fit(); } catch (_) {}
+      fitAndScroll();
+      xtermRef.current?.focus();
     },
     getContent: () => {
       const term = xtermRef.current;
@@ -168,9 +181,23 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPa
 
     terminal.open(termRef.current);
 
-    // Intercept Cmd+V to check for clipboard images before xterm handles paste
+    // Flag to skip xterm's built-in paste when we handle it ourselves
+    let skipNextPaste = false;
+
     terminal.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+      // Cmd+Down or Cmd+End: scroll to bottom
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'ArrowDown' || e.key === 'End') && e.type === 'keydown') {
+        terminal.scrollToBottom();
+        return false;
+      }
+      // Cmd+Up or Cmd+Home: scroll to top
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'ArrowUp' || e.key === 'Home') && e.type === 'keydown') {
+        terminal.scrollToTop();
+        return false;
+      }
+      // Cmd+V: check for image first, then paste text ourselves
       if ((e.metaKey || e.ctrlKey) && e.key === 'v' && e.type === 'keydown') {
+        skipNextPaste = true;
         pasteImageRef.current().then((handled) => {
           if (!handled) {
             navigator.clipboard.readText().then((text) => {
@@ -184,6 +211,21 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPa
       }
       return true;
     });
+
+    // Block xterm's built-in paste handler when we've already handled it
+    const origOnPaste = terminal.onData;
+    const pasteListener = (el: HTMLElement) => {
+      el.addEventListener('paste', (e: Event) => {
+        if (skipNextPaste) {
+          e.preventDefault();
+          e.stopPropagation();
+          skipNextPaste = false;
+        }
+      }, true);
+    };
+    // xterm renders a textarea for input — intercept paste on it
+    const xtermTextarea = termRef.current?.querySelector('.xterm-helper-textarea') as HTMLElement | null;
+    if (xtermTextarea) pasteListener(xtermTextarea);
 
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
@@ -285,19 +327,8 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, Props>(function TerminalPa
 
   // Re-fit terminal when becoming visible
   useEffect(() => {
-    if (isVisible && fitAddonRef.current && termRef.current) {
-      // Delay to ensure container has non-zero dimensions after display change
-      setTimeout(() => {
-        try {
-          const rect = termRef.current?.getBoundingClientRect();
-          if (rect && rect.width > 0 && rect.height > 0) {
-            fitAddonRef.current?.fit();
-            xtermRef.current?.scrollToBottom();
-          }
-        } catch (_) {
-          // ignore fit errors on hidden elements
-        }
-      }, 50);
+    if (isVisible) {
+      setTimeout(fitAndScroll, 50);
     }
   }, [isVisible]);
 
